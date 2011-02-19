@@ -1,0 +1,101 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Imagemaps uses an image field and an image style to display the images.
+ * Rendering the image in imagemaps modus will allow you to add pointers to
+ * the image. A second text field will be used to store the coordinates.
+ *
+ * You will find configuration for the form and elements you want to hook
+ * imagempas too as well as global configuration for the image_style, effects
+ * and extra properties.
+ *
+ */
+
+
+/**
+ * Create and manage imagemaps.
+ *
+ * @param array $field_image
+ *   The image field that will have coordinates on top.
+ * @param array $field_coordinates
+ *   A textfield where we will store the coordinates.
+ */
+function imagemaps_manage_display($field_image, & $field_coordinates) {
+
+  $language = $field_image['#language'];
+
+  $field_coordinates['#prefix'] = _imagemaps_render($field_image[$language][0]['#default_value']['uri'], $field_coordinates[$language][0]['value']['#default_value'], $language, TRUE);
+
+  // Hide the coordinates.
+  $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" /><div style="display: block;">';
+  $field_coordinates['#suffix'] = '</div>';
+
+  // Add a class to handle.
+  if (!isset($field_coordinates['#attributes']['class'])) {
+    $field_coordinates['#attributes']['class'] = array();
+  }
+  $field_coordinates['#attributes']['class'][] = 'imagemap-coordinates';
+
+  // Attach the javascript and css files for the imagemap UI.
+  $field_coordinates['#attached'] = array(
+    'js' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.js'),
+    'css' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.css')
+  );
+
+}
+
+/**
+ * Render and format the imagemap.
+ */
+function imagemaps_render($image_uri, $storage, $language = NULL) {
+
+  if (!isset($language)) {
+    $language = $GLOBALS['language'];
+  }
+
+  $output = _imagemaps_render($image_uri, $storage, $language);
+
+  // Attach the javascript and css files for the imagemap UI.
+  drupal_add_js(drupal_get_path('module', 'imagemaps') . '/imagemaps.js');
+  drupal_add_css(drupal_get_path('module', 'imagemaps') . '/imagemaps.css');
+
+  return $output;
+}
+
+/**
+ * Helper function to render the imagemap.
+ */
+function _imagemaps_render($image_uri, $storage, $language = NULL, $admin = false) {
+
+  $output = '';
+
+  // Fetch the interior image style, using its width and height
+  // for wrap the image rendered by image style.
+  $properties = image_style_load('interior');
+  foreach ($properties['effects'] as $effect) {
+    $width = $effect['data']['width'];
+    $height = $effect['data']['height'];
+    break;
+  }
+  $variables = array('path' => $image_uri, 'style_name' => 'interior');
+  $output .= '<div id="media-imagemap" style="width: ' . $width . 'px; height: ' . $height . 'px">';
+  $output .= theme('image_style', $variables);
+
+  // List the coordinates.
+  if (count($storage) > 0) {
+    foreach (explode(";", $storage) as $marker) {
+      parse_str($marker);
+      // available: x, y, id, description.
+      $output .= '<a href="#" rel="' . $x . '-' . $y . '" title="' . $description . '" alt="' . $description . '" class="bullet"></a>';
+    }
+  }
+  $output .= '</div>';
+
+  if ($admin) {
+   $output .= '<div id="imagemap-edit" style="width: ' . (900 - $width) . 'px; height: ' . $height . 'px"></div>';
+  }
+
+  return $output;
+}

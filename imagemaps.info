@@ -1,0 +1,4 @@
+name = Imagemaps
+description = Imagemaps to add markers with hoverable description to image fields.
+package = Effects
+core = 7.x
