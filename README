@@ -1,0 +1,5 @@
+This drupal module allows you to add coordinates to image fields (everywhere). 
+You can edit their description or remove the image marker again. 
+On the frontend the same dots will appear with the description in the hover.
+
+Later you will be able to upload or use custom icons.
