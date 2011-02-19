@@ -13,36 +13,51 @@
  *
  */
 
+/**
+ * Implements hook_menu().
+ */
+function imagemaps_menu() {
+
+  $items['admin/config/media/imagemaps/settings'] = array(
+    'title' => 'Imagemaps settings',
+    'description' => 'Configuration options for imagemaps usage.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('imagemaps_settings_page'),
+    'access arguments' => array('access administration pages'),
+    'file' => 'imagemaps.admin.inc',
+  );
+
+  return $items;
+
+}
 
 /**
- * Create and manage imagemaps.
- *
- * @param array $field_image
- *   The image field that will have coordinates on top.
- * @param array $field_coordinates
- *   A textfield where we will store the coordinates.
+ * Implements hook_form_alter().
  */
-function imagemaps_manage_display($field_image, & $field_coordinates) {
+function imagemaps_form_alter(& $form, & $form_state, $form_id) {
 
-  $language = $field_image['#language'];
-
-  $field_coordinates['#prefix'] = _imagemaps_render($field_image[$language][0]['#default_value']['uri'], $field_coordinates[$language][0]['value']['#default_value'], $language, TRUE);
-
-  // Hide the coordinates.
-  $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" /><div style="display: block;">';
-  $field_coordinates['#suffix'] = '</div>';
-
-  // Add a class to handle.
-  if (!isset($field_coordinates['#attributes']['class'])) {
-    $field_coordinates['#attributes']['class'] = array();
+  $fields = variable_get('imagemaps', array());
+  if (!empty($fields)) {
+    foreach ($fields as $field => $imagemap) {
+      $parts = explode("__", $field);
+      if ($form_id == $parts[1]  . '_' . $parts[0] . '_form') {
+        _imagemaps_form_alter($form, $form_state, $imagemap);
+      }
+      // TODO fix the other entities. I hope they are conventionally the same.
+    }
   }
-  $field_coordinates['#attributes']['class'][] = 'imagemap-coordinates';
 
-  // Attach the javascript and css files for the imagemap UI.
-  $field_coordinates['#attached'] = array(
-    'js' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.js'),
-    'css' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.css')
-  );
+}
+
+/**
+ * Helper function to alter a form with given imagemap fields.
+ */
+function _imagemaps_form_alter(& $form, & $form_state, $imagemap) {
+
+  module_load_include('inc', 'imagemaps', 'imagemaps.admin');
+
+  // Add the imagemap behavior to this form.
+  imagemaps_manage_display($form[$imagemap['field_image']], $form[$imagemap['field_data']], $imagemap['field_image_style']);
 
 }
 
@@ -52,7 +67,7 @@ function imagemaps_manage_display($field_image, & $field_coordinates) {
 function imagemaps_render($image_uri, $storage, $language = NULL) {
 
   if (!isset($language)) {
-    $language = $GLOBALS['language'];
+    $language = 'und';
   }
 
   $output = _imagemaps_render($image_uri, $storage, $language);
@@ -62,24 +77,25 @@ function imagemaps_render($image_uri, $storage, $language = NULL) {
   drupal_add_css(drupal_get_path('module', 'imagemaps') . '/imagemaps.css');
 
   return $output;
+
 }
 
 /**
  * Helper function to render the imagemap.
  */
-function _imagemaps_render($image_uri, $storage, $language = NULL, $admin = false) {
+function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL, $admin = false) {
 
   $output = '';
 
-  // Fetch the interior image style, using its width and height
+  // Fetch the $image_style image style, using its width and height
   // for wrap the image rendered by image style.
-  $properties = image_style_load('interior');
+  $properties = image_style_load($image_style);
   foreach ($properties['effects'] as $effect) {
     $width = $effect['data']['width'];
     $height = $effect['data']['height'];
     break;
   }
-  $variables = array('path' => $image_uri, 'style_name' => 'interior');
+  $variables = array('path' => $image_uri, 'style_name' => $image_style);
   $output .= '<div id="media-imagemap" style="width: ' . $width . 'px; height: ' . $height . 'px">';
   $output .= theme('image_style', $variables);
 
