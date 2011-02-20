@@ -22,12 +22,12 @@
       this.element = $element;
     };
     
-    this.onHover = function() {
+    this.onHover = function(event) {
 
       var $hoverElement = $('<span class="imagemap-hover-text">' + this.description  + '</span>');
       
       this.element
-        .prepend($hoverElement
+        .append($hoverElement
           .css({left: "+20px", top: "-" + $hoverElement.height()  +"px"})
           .hide()
           .fadeIn())
@@ -35,14 +35,15 @@
 
     };
     
-    this.onHoverOut = function() {
+    this.onHoverOut = function(event) {
+      this.element.attr('title', this.description);
       if (this.active == false) {
         this.element.find('.imagemap-hover-text').fadeOut('slow').remove();
       }
     };
     
-    this.click = function() {
-      
+    this.onClick = function(event) {
+
       if($.isFunction(this.editProperties)) {
         this.editProperties();
       }
@@ -72,7 +73,7 @@
   Drupal.ImageMap = Drupal.ImageMap || {};
 
   Drupal.ImageMap.coordinates = new Array();
-  Drupal.ImageMap.pointer = $('<a class="bullet" href="#" rel=""></a>');
+  Drupal.ImageMap.pointer = $('<a class="bullet" href="#" rel="" title="" alt=""></a>');
   Drupal.ImageMap.map = null;
   Drupal.ImageMap.currentMarker = '';
 
@@ -107,13 +108,14 @@
   
   // addCoordinate
   Drupal.ImageMap.addCoordinate = function(x, y, text) {
-    
+
     // Create a marker object.
     var marker = new Drupal.ImageMarker(x, y, text);
     var markerElement = Drupal.ImageMap.pointer.clone();
+
     markerElement.attr('rel', marker.id)
-      .attr('alt', marker.description)
-      .attr('title', marker.description);
+      .attr('title', marker.description)
+      .attr('alt', marker.description);
     marker.setElement(markerElement);
     
     // Append the new marker in the DOM.
@@ -127,6 +129,8 @@
     
     // Set the focus the new one.
     Drupal.ImageMap.setFocus(marker.id);
+    // Enforce a click.
+    marker.element.click();
     
     // Save the current markers in the coordinates area.
     Drupal.ImageMap.saveCoordinates();
@@ -161,9 +165,8 @@
       Drupal.ImageMap.coordinates[id].description = $('textarea[name="imagemap-edit-description"]').val();
 
       // Change the hover alt and title text.
-      Drupal.ImageMap.coordinates[id].element
-        .attr('alt', Drupal.ImageMap.coordinates[id].description)
-        .attr('title', Drupal.ImageMap.coordinates[id].description);
+      Drupal.ImageMap.coordinates[id].element.attr('alt', Drupal.ImageMap.coordinates[id].description)
+      Drupal.ImageMap.coordinates[id].element.attr('title', Drupal.ImageMap.coordinates[id].description);
       
     }
     
@@ -201,17 +204,17 @@
     marker.element.css({left: marker.x + 'px', top: marker.y + 'px'})
      .hide()
      .fadeIn()
-     .click(function() {
+     .click(function(event) {
        Drupal.ImageMap.setFocus(marker.id);
-       Drupal.ImageMap.coordinates[marker.id].click();
+       Drupal.ImageMap.coordinates[marker.id].onClick(event);
        return false;
      })
-     .hover(function() {
-       Drupal.ImageMap.coordinates[marker.id].onHover();
+     .hover(function(event) {
+       Drupal.ImageMap.coordinates[marker.id].onHover(event);
        return false;
      },
-     function() {
-       Drupal.ImageMap.coordinates[marker.id].onHoverOut();
+     function(event) {
+       Drupal.ImageMap.coordinates[marker.id].onHoverOut(event);
        return false;
      });
   
