@@ -193,23 +193,27 @@ function _imagemaps_load_imagestyle($image_style) {
  */
 function _imagemaps_load_imagemaps() {
 
-  $maps = array();
+  static $maps = array();
 
-  $fields = variable_get('imagemaps', array());
-  if (!empty($fields)) {
-    foreach ($fields as $field => $imagemap) {
-      $parts = explode("__", $field);
-      if ($parts[0] != 'imagemaps') {
-        $maps[] = array(
-          'field' => $field,
-          'field_image' => $imagemap['field_image'],
-          'field_data' => $imagemap['field_data'],
-          'entity' => $parts[0],
-          'bundle' => $parts[1],
-          'image_style' => $imagemap['field_image_style']
-        );
+  if (empty($maps)) {
+
+    $fields = variable_get('imagemaps', array());
+    if (!empty($fields)) {
+      foreach ($fields as $field => $imagemap) {
+        $parts = explode("__", $field);
+        if ($parts[0] != 'imagemaps') {
+          $maps[] = array(
+            'field' => $field,
+            'field_image' => $imagemap['field_image'],
+            'field_data' => $imagemap['field_data'],
+            'entity' => $parts[0],
+            'bundle' => $parts[1],
+            'image_style' => $imagemap['field_image_style']
+          );
+        }
       }
     }
+
   }
 
   return $maps;
