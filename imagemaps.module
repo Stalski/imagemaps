@@ -154,7 +154,7 @@ function imagemaps_manage_display($field_image) {
     $field_coordinates = &$field_image[0]['imagemap'];
 
     // @todo pass default value here
-    $coordinates = array();
+    $coordinates = $field_image[0]['imagemap']['#value'];
     $field_coordinates['#prefix'] = _imagemaps_render($field_image[0]['#file']->uri, $coordinates, $image_style);
 
     $properties = _imagemaps_load_imagestyle($image_style);
@@ -162,8 +162,8 @@ function imagemaps_manage_display($field_image) {
 
     // Hide the coordinates.
     $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" />';
-    //$field_coordinates['#prefix'] .= '<div style="display: none;">';
-    //$field_coordinates['#suffix'] = '</div>';
+    $field_coordinates['#prefix'] .= '<div style="display: none;">';
+    $field_coordinates['#suffix'] = '</div>';
 
     // Add a class to handle.
     if (!isset($field_coordinates['#attributes']['class'])) {
