@@ -50,6 +50,47 @@ function imagemaps_form_alter(& $form, & $form_state, $form_id) {
 }
 
 /**
+ * Implements hook_field_formatter_info().
+ */
+function imagemaps_field_formatter_info() {
+
+  return array(
+    'image_imagemap' => array(
+      'label' => t('Imagemap'),
+      'field types' => array('image'),
+    ),
+  );
+
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function imagemaps_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+
+  $element = array();
+
+  switch ($display['type']) {
+    case 'image_imagemap':
+
+      $output = '';
+      $item = $items[0];
+      $maps = _imagemaps_load_imagemaps();
+      foreach ($maps as $map) {
+        if ($map['entity'] == $entity_type && $map['bundle'] == $instance['bundle']) {
+          $output = imagemaps_render($entity, $map);
+        }
+      }
+
+      $element[0] = array('#markup' => $output);
+      break;
+  }
+
+  return $element;
+
+}
+
+/**
  * Helper function to alter a form with given imagemap fields.
  */
 function _imagemaps_form_alter(& $form, & $form_state, $imagemap) {
@@ -62,19 +103,27 @@ function _imagemaps_form_alter(& $form, & $form_state, $imagemap) {
 }
 
 /**
- * Render and format the imagemap.
+ * Render the imagemap by entity and imagemap configuration.
+ * This function will be used on frontend displays.
+ * @see imagemaps_manage_display
+ *   Administration form function to achieve the same effect.
  */
-function imagemaps_render($image_uri, $storage, $language = NULL) {
+function imagemaps_render($entity, $map) {
 
-  if (!isset($language)) {
-    $language = 'und';
+  $language = isset($entity->language) ? $entity->language : 'und';
+  $image_field = $map['field_image'];
+  $data_field = $map['field_data'];
+
+  $output = '';
+  if (isset($entity->{$image_field}[$language][0]) && isset($entity->{$data_field}[$language][0])) {
+
+    $output = _imagemaps_render($entity->{$image_field}[$language][0]['uri'], $entity->{$data_field}[$language][0]['value'], $map['image_style'], $language);
+
+    // Attach the javascript and css files for the imagemap UI.
+    drupal_add_js(drupal_get_path('module', 'imagemaps') . '/imagemaps.js');
+    drupal_add_css(drupal_get_path('module', 'imagemaps') . '/imagemaps.css');
+
   }
-
-  $output = _imagemaps_render($image_uri, $storage, $language);
-
-  // Attach the javascript and css files for the imagemap UI.
-  drupal_add_js(drupal_get_path('module', 'imagemaps') . '/imagemaps.js');
-  drupal_add_css(drupal_get_path('module', 'imagemaps') . '/imagemaps.css');
 
   return $output;
 
@@ -82,21 +131,24 @@ function imagemaps_render($image_uri, $storage, $language = NULL) {
 
 /**
  * Helper function to render the imagemap.
+ *
+ * @param string $image_uri
+ *   The uri of the image
+ * @param string $storage
+ *   The stored coordinates in raw format
+ * @param string $language
+ *   The language to be used.
+ * @return
+ *   A string with valid html with the rendered imagemap.
  */
-function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL, $admin = false) {
+function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL) {
 
   $output = '';
 
-  // Fetch the $image_style image style, using its width and height
-  // for wrap the image rendered by image style.
-  $properties = image_style_load($image_style);
-  foreach ($properties['effects'] as $effect) {
-    $width = $effect['data']['width'];
-    $height = $effect['data']['height'];
-    break;
-  }
+  $properties = _imagemaps_load_imagestyle($image_style);
+
   $variables = array('path' => $image_uri, 'style_name' => $image_style);
-  $output .= '<div id="media-imagemap" style="width: ' . $width . 'px; height: ' . $height . 'px">';
+  $output .= '<div id="media-imagemap" style="width: ' . $properties['width'] . 'px; height: ' . $properties['height'] . 'px">';
   $output .= theme('image_style', $variables);
 
   // List the coordinates.
@@ -109,9 +161,57 @@ function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL,
   }
   $output .= '</div>';
 
-  if ($admin) {
-   $output .= '<div id="imagemap-edit" style="width: ' . (900 - $width) . 'px; height: ' . $height . 'px"></div>';
+  return $output;
+
+}
+
+/**
+ * Helper function to get DOM properties for imagestyles.
+ */
+function _imagemaps_load_imagestyle($image_style) {
+
+  static $image_styles = array();
+
+  if (!isset($image_styles[$image_style])) {
+    // Fetch the $image_style image style, using its width and height
+    // for wrap the image rendered by image style.
+    $properties = image_style_load($image_style);
+    foreach ($properties['effects'] as $effect) {
+      $image_styles[$image_style]['name'] = $image_style;
+      $image_styles[$image_style]['width'] = $effect['data']['width'];
+      $image_styles[$image_style]['height'] = $effect['data']['height'];
+      break;
+    }
   }
 
-  return $output;
+  return $image_styles[$image_style];
+
+}
+
+/**
+ * Helper function to fetch the imagemaps.
+ */
+function _imagemaps_load_imagemaps() {
+
+  $maps = array();
+
+  $fields = variable_get('imagemaps', array());
+  if (!empty($fields)) {
+    foreach ($fields as $field => $imagemap) {
+      $parts = explode("__", $field);
+      if ($parts[0] != 'imagemaps') {
+        $maps[] = array(
+          'field' => $field,
+          'field_image' => $imagemap['field_image'],
+          'field_data' => $imagemap['field_data'],
+          'entity' => $parts[0],
+          'bundle' => $parts[1],
+          'image_style' => $imagemap['field_image_style']
+        );
+      }
+    }
+  }
+
+  return $maps;
+
 }

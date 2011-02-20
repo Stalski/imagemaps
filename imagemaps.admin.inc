@@ -18,26 +18,36 @@
  * @param String $image_style
  *   The image style for the imagemap.
  */
-function imagemaps_manage_display($field_image, & $field_coordinates, $image_style) {
+function imagemaps_manage_display(& $field_image, & $field_coordinates, $image_style) {
 
   $language = isset($field_image['#language']) ? $field_image['#language'] : 'und';
 
-  $field_coordinates['#prefix'] = _imagemaps_render($field_image[$language][0]['#default_value']['uri'], $field_coordinates[$language][0]['value']['#default_value'], $image_style, $language, TRUE);
+  if (isset($field_image[$language][0]['#default_value'], $field_image[$language][0]['#default_value']['uri'])) {
 
-  // Hide the coordinates.
-  $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" /><div style="display: block;">';
-  $field_coordinates['#suffix'] = '</div>';
+    $field_coordinates['#prefix'] = _imagemaps_render($field_image[$language][0]['#default_value']['uri'], $field_coordinates[$language][0]['value']['#default_value'], $image_style, $language);
 
-  // Add a class to handle.
-  if (!isset($field_coordinates['#attributes']['class'])) {
-    $field_coordinates['#attributes']['class'] = array();
+    $properties = _imagemaps_load_imagestyle($image_style);
+    $field_coordinates['#prefix'] .= '<div id="imagemap-edit" style="width: ' . (900 - $properties['width']) . 'px; height: ' . $properties['height'] . 'px"></div>';
+
+    // Hide the coordinates.
+    $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" /><div style="display: none;">';
+    $field_coordinates['#suffix'] = '</div>';
+
+    // Add a class to handle.
+    if (!isset($field_coordinates['#attributes']['class'])) {
+      $field_coordinates['#attributes']['class'] = array();
+    }
+    $field_coordinates['#attributes']['class'][] = 'imagemap-coordinates';
+
   }
-  $field_coordinates['#attributes']['class'][] = 'imagemap-coordinates';
 
   // Attach the javascript and css files for the imagemap UI.
   $field_coordinates['#attached'] = array(
-    'js' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.js'),
-    'css' => array(drupal_get_path('module', 'imagemaps') . '/imagemaps.css')
+    'js' => array(
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.js',
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.admin.js'),
+    'css' => array(
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.css')
   );
 
 }
@@ -117,34 +127,45 @@ function imagemaps_settings_page() {
             $data_options[$instance['field_name']] = $instance['label'];
           }
         }
-        if (empty($image_options) || empty($data_options)) {
-          drupal_set_message(t('Incomplete configuration found for @type. Every imagemap needs a textarea and an image field to properly function.', array('@type' => $imagemaps_form)));
-        }
-        else {
+      }
+      if (empty($image_options) || empty($data_options)) {
 
-          $form['imagemaps'][$imagemaps_form]['field_image'] = array(
-            '#type' => 'select',
-            '#title' => t('Select the field for the image'),
-            '#default_value' => $fields[$imagemaps_form]['field_image'],
-            '#options' => $image_options,
-          );
-          $form['imagemaps'][$imagemaps_form]['field_data'] = array(
-            '#type' => 'select',
-            '#title' => t('Select the text field to store the coordinates.'),
-            '#default_value' => $fields[$imagemaps_form]['field_data'],
-            '#options' => $data_options,
-          );
-          $style_options = array();
-          foreach (image_styles() as $style) {
-            $style_options[$style['name']] = $style['name'];
-          }
-          $form['imagemaps'][$imagemaps_form]['field_image_style'] = array(
-            '#type' => 'select',
-            '#title' => t('Select the image style used.'),
-            '#default_value' => $fields[$imagemaps_form]['field_image_style'],
-            '#options' => $style_options,
-          );
+        $warning = t('Incomplete configuration found for @type. Every imagemap needs a textarea and an image field to properly function.', array('@type' => $imagemaps_form));
+        if (empty($image_options)) {
+          $warning .= t('<br />No image field found for this type.');
         }
+        if (empty($image_options)) {
+          $warning .= t('<br />No data field or textarea found for this type.');
+        }
+        $form['imagemaps'][$imagemaps_form]['error_message'] = array(
+          '#markup' => $warning,
+        );
+
+      }
+      else {
+
+        $form['imagemaps'][$imagemaps_form]['field_image'] = array(
+          '#type' => 'select',
+          '#title' => t('Select the field for the image'),
+          '#default_value' => isset($fields[$imagemaps_form]['field_image']) ? $fields[$imagemaps_form]['field_image'] : '',
+          '#options' => $image_options,
+        );
+        $form['imagemaps'][$imagemaps_form]['field_data'] = array(
+          '#type' => 'select',
+          '#title' => t('Select the text field to store the coordinates.'),
+          '#default_value' => isset($fields[$imagemaps_form]['field_data']) ? $fields[$imagemaps_form]['field_data'] : '',
+          '#options' => $data_options,
+        );
+        $style_options = array();
+        foreach (image_styles() as $style) {
+          $style_options[$style['name']] = $style['name'];
+        }
+        $form['imagemaps'][$imagemaps_form]['field_image_style'] = array(
+          '#type' => 'select',
+          '#title' => t('Select the image style used.'),
+          '#default_value' => isset($fields[$imagemaps_form]['field_image_style']) ? $fields[$imagemaps_form]['field_image_style'] : '',
+          '#options' => $style_options,
+        );
       }
     }
   }

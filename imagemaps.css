@@ -1,6 +1,6 @@
 @CHARSET "UTF-8";
 
-#media_imagemap {
+#media-imagemap {
   position: relative;
   clear: both;
 }
@@ -22,12 +22,13 @@
   margin-bottom: 20px;
 }
 
-a.bullet {
+#media-imagemap a.bullet {
   background: transparent url(images/bullet.png) 50% 50% no-repeat;
   display: block;
   width: 12px;
-  height: 12px;
+  height: 11px;
   position: absolute; left: 0; top: 0;
+  outline: none;
 }
 
 .imagemap-button {
@@ -35,4 +36,21 @@ a.bullet {
   border: 1px solid #ABABAB;
   padding: 3px 5px;
   margin-right: 10px;
+}
+
+a .imagemap-hover-text {
+  position: absolute; left: 0; top: 0; z-index: 1; 
+  border: 1px solid #AAA;
+  background: #CCC none; 
+  min-width: 100px;
+  _min-width: 100px;
+  padding: 3px;
+  display: block;
+  color: #666;
+}
+
+a.bullet:hover,
+a.bullet:active,
+a.bullet:focus {
+  text-decoration: none !important;  
 }

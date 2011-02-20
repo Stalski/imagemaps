@@ -5,9 +5,8 @@
    * 
    * ImageMarker object.
    * 
-   * Note that this object has a hard dependency to the Suzuki.ImageMap object.
-   * Click handlers to update / remove coordinates need to push the new information
-   * back to Drupal.ImageMap.
+   * Note that this object has a hard dependency to the Drupal.ImageMap object.
+   * @see imagemaps.admin.js for an example of prototype overrides.
    * 
    */  
   Drupal.ImageMarker = function(x, y, text) {
@@ -17,40 +16,50 @@
     this.description = text;
     this.element = null;
     this.id = x + "-" + y;
-    
-    this.editProperties = function() {
-
-      var self = this;
-      if ($('#imagemap-edit').find('.imagemap-edit-x').length == 0) {
-        this.attachForm();
-      }
-      $('input[name="imagemap-edit-x"]').val(this.x);
-      $('input[name="imagemap-edit-y"]').val(this.y);
-      $('textarea[name="imagemap-edit-description"]').val(this.description);
-            
-    };
-    
-    this.attachForm = function() {
-      $('#imagemap-edit')
-        .append($('<label>X</label>'))
-        .append($('<input readonly="readonly" name="imagemap-edit-x" class="imagemap-edit-x" />'))
-        .append($('<label>Y</label>'))
-        .append($('<input readonly="readonly" name="imagemap-edit-y" class="imagemap-edit-y" />'))
-        .append($('<label>Description</label>'))
-        .append($('<textarea name="imagemap-edit-description" class="imagemap-edit-description text-full form-textarea"></textarea>'))
-        .append($('<input type="button" class="imagemap-button" name="imagemap-edit-submit" value="' + Drupal.t('Save') + '" />')
-          .click(function() {
-            Drupal.ImageMap.saveCoordinates();
-          }))
-        .append($('<input type="button" class="imagemap-button" name="imagemap-edit-remove" value="' + Drupal.t('Remove') + '" />')
-          .click(function() {
-            Drupal.ImageMap.removeCoordinate();
-          }));
-    };
+    this.active = false;
     
     this.setElement = function($element) {
       this.element = $element;
     };
+    
+    this.onHover = function() {
+
+      var $hoverElement = $('<span class="imagemap-hover-text">' + this.description  + '</span>');
+      
+      this.element
+        .prepend($hoverElement
+          .css({left: "+20px", top: "-" + $hoverElement.height()  +"px"})
+          .hide()
+          .fadeIn())
+        .attr('title', '');
+
+    };
+    
+    this.onHoverOut = function() {
+      if (this.active == false) {
+        this.element.find('.imagemap-hover-text').fadeOut('slow').remove();
+      }
+    };
+    
+    this.click = function() {
+      
+      if($.isFunction(this.editProperties)) {
+        this.editProperties();
+      }
+      else {
+        if (this.active === true) {
+          this.active = false;
+          this.onHoverOut();
+        }
+        else {
+          this.active = true;
+          this.onHover();          
+        }        
+      }
+      
+    };
+    
+    return this;
     
   };
   
@@ -69,15 +78,31 @@
 
   // Init
   Drupal.ImageMap.init = function() {
-    
+
     Drupal.ImageMap.map.click(function(e) {
+      
       if($(e.target).is('img')) {
-        Drupal.ImageMap.addCoordinate(e.layerX - Drupal.ImageMap.pointer.width() - (Drupal.ImageMap.pointer.width() / 2), e.layerY - (Drupal.ImageMap.pointer.height() / 2), Drupal.t('add description'));
+        var x = e.layerX - (Drupal.ImageMap.pointer.width() / 2);
+        var y = e.layerY - (Drupal.ImageMap.pointer.height() / 2);
+        Drupal.ImageMap.addCoordinate(x, y, Drupal.t('add description'));
       }
     });
     
-    Drupal.ImageMap.initMarkers();
+  };
+  
+  // attachMarkers
+  Drupal.ImageMap.attachMarkers = function() {
 
+    Drupal.ImageMap.map.children('a.bullet').each(function(){
+      var coords = $(this).attr('rel').split('-');
+      var description = $(this).attr('alt');
+      var marker = new Drupal.ImageMarker(coords[0], coords[1], description);
+      marker.setElement($(this));
+      Drupal.ImageMap.coordinates[marker.id] = marker;
+    });
+    
+    Drupal.ImageMap.processMarkers();
+    
   };
   
   // addCoordinate
@@ -155,8 +180,9 @@
   
   // setFocus
   Drupal.ImageMap.setFocus = function(id) {
+
     Drupal.ImageMap.currentMarker = id;
-    Drupal.ImageMap.coordinates[Drupal.ImageMap.currentMarker].editProperties();
+
   };
   
   // processMarkers
@@ -177,24 +203,18 @@
      .fadeIn()
      .click(function() {
        Drupal.ImageMap.setFocus(marker.id);
+       Drupal.ImageMap.coordinates[marker.id].click();
+       return false;
+     })
+     .hover(function() {
+       Drupal.ImageMap.coordinates[marker.id].onHover();
+       return false;
+     },
+     function() {
+       Drupal.ImageMap.coordinates[marker.id].onHoverOut();
        return false;
      });
   
-  };
-  
-  // initMarkers
-  Drupal.ImageMap.initMarkers = function() {
-
-    Drupal.ImageMap.map.children('a.bullet').each(function(){
-      var coords = $(this).attr('rel').split('-');
-      var description = $(this).attr('alt');
-      var marker = new Drupal.ImageMarker(coords[0], coords[1], description);
-      marker.setElement($(this));
-      Drupal.ImageMap.coordinates[marker.id] = marker;
-    });
-    
-    Drupal.ImageMap.processMarkers();
-    
   };
   
   
@@ -207,8 +227,11 @@
   Drupal.behaviors.ImageMap = {
 
     attach : function(context, settings) {
+    
       Drupal.ImageMap.map = $("#media-imagemap");
-      Drupal.ImageMap.init();
+      
+      // Attach the markers to the imagemap.
+      Drupal.ImageMap.attachMarkers();
     }
 
   };
