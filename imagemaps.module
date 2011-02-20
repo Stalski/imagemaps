@@ -161,7 +161,8 @@ function imagemaps_manage_display($field_image) {
     $field_coordinates['#prefix'] .= '<div id="imagemap-edit" style="width: ' . (900 - $properties['width']) . 'px; height: ' . $properties['height'] . 'px"></div>';
 
     // Hide the coordinates.
-    //$field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" /><div style="display: none;">';
+    $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" />';
+    //$field_coordinates['#prefix'] .= '<div style="display: none;">';
     //$field_coordinates['#suffix'] = '</div>';
 
     // Add a class to handle.
