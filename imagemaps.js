@@ -160,7 +160,7 @@
     
     // Check the latest description for updates.
     if (Drupal.ImageMap.currentMarker != '') {
-      
+            
       var id = Drupal.ImageMap.currentMarker;
       Drupal.ImageMap.coordinates[id].description = $('textarea[name="imagemap-edit-description"]').val();
 
@@ -177,7 +177,8 @@
       var marker = Drupal.ImageMap.coordinates[n];
       markers.push(jQuery.param({x: marker.x, y: marker.y, id: marker.id, description: marker.description}, true));
     }
-    $('.imagemap-coordinates textarea').val(markers.join(";"));
+    console.log(markers);
+    $('.imagemap-coordinates').val(markers.join(";"));
     
   };
   

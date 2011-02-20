@@ -3,50 +3,98 @@
 
 /**
  * @file
- * Imagemaps uses an image field and an image style to display the images.
- * Rendering the image in imagemaps modus will allow you to add pointers to
- * the image. A second text field will be used to store the coordinates.
- *
- * You will find configuration for the form and elements you want to hook
- * imagempas too as well as global configuration for the image_style, effects
- * and extra properties.
- *
+ * Create images with one or more annotations on them.
  */
 
 /**
- * Implements hook_menu().
+ * Implements hook_field_info_alter().
  */
-function imagemaps_menu() {
-
-  $items['admin/config/media/imagemaps/settings'] = array(
-    'title' => 'Imagemaps settings',
-    'description' => 'Configuration options for imagemaps usage.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('imagemaps_settings_page'),
-    'access arguments' => array('access administration pages'),
-    'file' => 'imagemaps.admin.inc',
-  );
-
-  return $items;
-
+function imagemaps_field_info_alter(&$info) {
+  // Change properties for fields of type 'image'.
+  if (isset($info['image'])) {
+    $info['image']['instance_settings']['imagemap'] = FALSE;
+    $info['image']['module'] = 'imagemaps';
+  }
 }
 
 /**
- * Implements hook_form_alter().
+ * Imagemaps field settings form.
  */
-function imagemaps_form_alter(& $form, & $form_state, $form_id) {
+function imagemaps_field_settings_form($field, $instance) {
+  $form = image_field_settings_form($field, $instance);
+  return $form;
+}
 
-  $fields = variable_get('imagemaps', array());
-  if (!empty($fields)) {
-    foreach ($fields as $field => $imagemap) {
-      $parts = explode("__", $field);
-      if ($form_id == $parts[1]  . '_' . $parts[0] . '_form') {
-        _imagemaps_form_alter($form, $form_state, $imagemap);
-      }
-      // TODO fix the other entities. I hope they are conventionally the same.
+/**
+ * Imagemaps instance settings form.
+ */
+function imagemaps_field_instance_settings_form($field, $instance) {
+  $form = image_field_instance_settings_form($field, $instance);
+
+  // @todo maybe add validate function to make sure the limit is set to 1
+  // or are we going to support multiple images too ?
+
+  // Add imagemap checkbox.
+  $form['imagemap'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable imagemap'),
+    '#description' => t('Add imagemap functionality to this image field.'),
+    '#default_value' => isset($instance['settings']['imagemap']) ? $instance['settings']['imagemap'] : FALSE,
+    '#weight' => 20,
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_field_schema().
+ */
+function imagemaps_field_schema($field) {
+  module_load_include('install', 'image');
+  $schema = image_field_schema($field);
+  // @todo should be long text and coordinates is probably better
+  // update in attach_form if we change it.
+  $schema['columns']['imagemap'] = array(
+    'description' => "Imagemap coordinates",
+    'type' => 'varchar',
+    'length' => 128,
+    'not null' => FALSE,
+  );
+  return $schema;
+}
+
+/**
+ * Implements hook_field_attach_form().
+ */
+function imagemaps_field_attach_form($entity_type, $entity, &$form, &$form_state, $langcode = NULL) {
+
+  $instances = field_info_instances($entity_type, $form['#bundle']);
+
+  foreach ($instances as $key => $field) {
+
+    // Act only if imagemap is TRUE.
+    if (isset($field['settings']['imagemap']) && !$field['settings']['imagemap']) {
+      continue;
     }
-  }
 
+    $language = isset($form[$key]['#language']) ? $form[$key]['#language'] : LANGUAGE_NONE;
+
+    // Add coordinates to this field.
+    $form[$key][$language][0]['imagemap'] = array(
+      '#type' => 'textarea',
+      '#default_value' => isset($entity->{$key}{$language}[0]['imagemap']) ? $entity->{$key}{$language}[0]['imagemap'] : '',
+    );
+
+    // Add process function.
+    $form[$key][$language]['#after_build'][] = 'imagemaps_manage_display';
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function imagemaps_field_is_empty($item, $field) {
+  return image_field_is_empty($item, $field);
 }
 
 /**
@@ -60,7 +108,6 @@ function imagemaps_field_formatter_info() {
       'field types' => array('image'),
     ),
   );
-
 }
 
 /**
@@ -73,33 +120,68 @@ function imagemaps_field_formatter_view($entity_type, $entity, $field, $instance
   switch ($display['type']) {
     case 'image_imagemap':
 
-      $output = '';
-      $item = $items[0];
-      $maps = _imagemaps_load_imagemaps();
-      foreach ($maps as $map) {
-        if ($map['entity'] == $entity_type && $map['bundle'] == $instance['bundle']) {
-          $output = imagemaps_render($entity, $map);
-        }
+      if (isset($instance['settings']['imagemap']) && $instance['settings']['imagemap']) {
+        $field_name = $field['field_name'];
+        // @todo get this from instance settings also.
+        $image_style = 'large';
+        $output = imagemaps_render($entity, $image_style, $field_name);
+        $element[0] = array('#markup' => $output);
       }
-
-      $element[0] = array('#markup' => $output);
       break;
   }
 
   return $element;
-
 }
 
 /**
- * Helper function to alter a form with given imagemap fields.
+ * Create and manage imagemaps.
+ *
+ * @param array $field_image
+ *   The image field that will have coordinates on top.
+ * @param array $field_coordinates
+ *   A textfield where we will store the coordinates.
+ * @param String $image_style
+ *   The image style for the imagemap.
  */
-function _imagemaps_form_alter(& $form, & $form_state, $imagemap) {
+function imagemaps_manage_display($field_image) {
 
-  module_load_include('inc', 'imagemaps', 'imagemaps.admin');
+  // @todo get this from settings.
+  $image_style = 'large';
 
-  // Add the imagemap behavior to this form.
-  imagemaps_manage_display($form[$imagemap['field_image']], $form[$imagemap['field_data']], $imagemap['field_image_style']);
+  if (isset($field_image[0]['#default_value'], $field_image[0]['#file']->uri)) {
 
+    // Build field coordinates textarea.
+    $field_coordinates = &$field_image[0]['imagemap'];
+
+    // @todo pass default value here
+    $coordinates = array();
+    $field_coordinates['#prefix'] = _imagemaps_render($field_image[0]['#file']->uri, $coordinates, $image_style);
+
+    $properties = _imagemaps_load_imagestyle($image_style);
+    $field_coordinates['#prefix'] .= '<div id="imagemap-edit" style="width: ' . (900 - $properties['width']) . 'px; height: ' . $properties['height'] . 'px"></div>';
+
+    // Hide the coordinates.
+    $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" />';
+    //$field_coordinates['#prefix'] .= '<div style="display: none;">';
+    //$field_coordinates['#suffix'] = '</div>';
+
+    // Add a class to handle.
+    if (!isset($field_coordinates['#attributes']['class'])) {
+      $field_coordinates['#attributes']['class'] = array();
+    }
+    $field_coordinates['#attributes']['class'][] = 'imagemap-coordinates';
+  }
+
+  // Attach the javascript and css files for the imagemap UI.
+  $field_coordinates['#attached'] = array(
+    'js' => array(
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.js',
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.admin.js'),
+    'css' => array(
+      drupal_get_path('module', 'imagemaps') . '/imagemaps.css')
+  );
+
+  return $field_image;
 }
 
 /**
@@ -108,25 +190,28 @@ function _imagemaps_form_alter(& $form, & $form_state, $imagemap) {
  * @see imagemaps_manage_display
  *   Administration form function to achieve the same effect.
  */
-function imagemaps_render($entity, $map) {
+function imagemaps_render($entity, $image_style, $image_field) {
 
-  $language = isset($entity->language) ? $entity->language : 'und';
-  $image_field = $map['field_image'];
-  $data_field = $map['field_data'];
+  $language = isset($entity->language) ? $entity->language : LANGUAGE_NONE;
+  $coordinates = (isset($entity->{$image_field}[$language][0]['imagemap'])) ? $entity->{$image_field}[$language][0]['imagemap'] : '';
 
   $output = '';
-  if (isset($entity->{$image_field}[$language][0]) && isset($entity->{$data_field}[$language][0])) {
+  // @todo fallback if coordinates is empty or malformed and simply return the style?
+  if (!empty($coordinates)) {
 
-    $output = _imagemaps_render($entity->{$image_field}[$language][0]['uri'], $entity->{$data_field}[$language][0]['value'], $map['image_style'], $language);
+    // Load the file.
+    // @todo probably add more validation like in image_prepare_view().
+    $file = file_load($entity->{$image_field}[$language][0]['fid']);
+    $output = _imagemaps_render($file->uri, $coordinates, $image_style, $language);
 
     // Attach the javascript and css files for the imagemap UI.
+    // @todo use attached so caching can work ?
     drupal_add_js(drupal_get_path('module', 'imagemaps') . '/imagemaps.js');
     drupal_add_css(drupal_get_path('module', 'imagemaps') . '/imagemaps.css');
 
   }
 
   return $output;
-
 }
 
 /**
@@ -136,12 +221,11 @@ function imagemaps_render($entity, $map) {
  *   The uri of the image
  * @param string $storage
  *   The stored coordinates in raw format
- * @param string $language
- *   The language to be used.
+
  * @return
  *   A string with valid html with the rendered imagemap.
  */
-function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL) {
+function _imagemaps_render($image_uri, $storage, $image_style) {
 
   $output = '';
 
@@ -185,37 +269,4 @@ function _imagemaps_load_imagestyle($image_style) {
   }
 
   return $image_styles[$image_style];
-
-}
-
-/**
- * Helper function to fetch the imagemaps.
- */
-function _imagemaps_load_imagemaps() {
-
-  static $maps = array();
-
-  if (empty($maps)) {
-
-    $fields = variable_get('imagemaps', array());
-    if (!empty($fields)) {
-      foreach ($fields as $field => $imagemap) {
-        $parts = explode("__", $field);
-        if ($parts[0] != 'imagemaps') {
-          $maps[] = array(
-            'field' => $field,
-            'field_image' => $imagemap['field_image'],
-            'field_data' => $imagemap['field_data'],
-            'entity' => $parts[0],
-            'bundle' => $parts[1],
-            'image_style' => $imagemap['field_image_style']
-          );
-        }
-      }
-    }
-
-  }
-
-  return $maps;
-
 }
