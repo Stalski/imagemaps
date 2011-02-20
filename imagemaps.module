@@ -156,7 +156,7 @@ function _imagemaps_render($image_uri, $storage, $image_style, $language = NULL)
     foreach (explode(";", $storage) as $marker) {
       parse_str($marker);
       // available: x, y, id, description.
-      $output .= '<a href="#" rel="' . $x . '-' . $y . '" title="' . $description . '" alt="' . $description . '" class="bullet"></a>';
+      $output .= '<a href="#" rel="' . $x . '-' . $y . '" title="' . check_plain($description) . '" alt="' . check_plain($description) . '" class="bullet"></a>';
     }
   }
   $output .= '</div>';
