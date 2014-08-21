@@ -52,12 +52,9 @@ function imagemaps_field_instance_settings_form($field, $instance) {
 function imagemaps_field_schema($field) {
   module_load_include('install', 'image');
   $schema = image_field_schema($field);
-  // @todo should be long text and coordinates is probably better
-  // update in attach_form if we change it.
   $schema['columns']['imagemap'] = array(
-    'description' => "Imagemap coordinates",
-    'type' => 'varchar',
-    'length' => 128,
+    'type' => 'text',
+    'size' => 'big',
     'not null' => FALSE,
   );
   return $schema;
@@ -150,11 +147,9 @@ function imagemaps_manage_display($field_image) {
 
   if (isset($field_image[0]['#default_value'], $field_image[0]['#file']->uri)) {
 
-    // Build field coordinates textarea.
+    // Build annotation field.
+    $coordinates = $field_image[0]['imagemap']['#value'];
     $field_coordinates = &$field_image[0]['imagemap'];
-
-    // @todo pass default value here
-    $coordinates = array();
     $field_coordinates['#prefix'] = _imagemaps_render($field_image[0]['#file']->uri, $coordinates, $image_style);
 
     $properties = _imagemaps_load_imagestyle($image_style);
@@ -162,8 +157,8 @@ function imagemaps_manage_display($field_image) {
 
     // Hide the coordinates.
     $field_coordinates['#prefix'] .= '<br style="clear: both; width: 100%;" />';
-    //$field_coordinates['#prefix'] .= '<div style="display: none;">';
-    //$field_coordinates['#suffix'] = '</div>';
+    $field_coordinates['#prefix'] .= '<div style="display: none;">';
+    $field_coordinates['#suffix'] = '</div>';
 
     // Add a class to handle.
     if (!isset($field_coordinates['#attributes']['class'])) {
